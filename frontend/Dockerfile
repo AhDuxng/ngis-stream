@@ -1,0 +1,23 @@
+# Frontend image. Builds the React/Vite application with Node.js 20 and serves
+# the static bundle from nginx with a single-page-application fallback to
+# index.html.
+
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci && chmod -R +x node_modules/.bin
+
+COPY . .
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+RUN printf 'server {\n  listen 80;\n  server_name _;\n\n  root /usr/share/nginx/html;\n  index index.html;\n\n  location / {\n    try_files $uri $uri/ /index.html;\n  }\n}\n' > /etc/nginx/conf.d/default.conf
+
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,99 @@
+# Local Docker Compose stack for NGIS Stream. COMPOSE_PROFILES enables exactly
+# one reverse proxy (caddy or openlitespeed). The backend joins the network
+# namespace of that proxy so tc/netem rules act on the media path. Use
+# scripts/switch-proxy.sh to change the proxy.
+
+services:
+  caddy:
+    profiles: ["caddy"]
+    build:
+      context: ./caddy_config
+      dockerfile: Dockerfile
+    container_name: caddy_server
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./caddy_config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./video:/srv/video:ro
+      - caddy_data:/data
+      - caddy_runtime_config:/config
+      - ${CADDY_QLOG_HOST_DIR:-./logs/caddy-qlog}:/qlog
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - PORT=${PORT:-3000}
+      - QLOGDIR=${CADDY_QLOGDIR:-}
+    depends_on:
+      - frontend
+    networks:
+      - app-network
+
+  openlitespeed:
+    profiles: ["openlitespeed"]
+    build:
+      context: ./openlitespeed_config
+      dockerfile: Dockerfile
+    container_name: openlitespeed_server
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    shm_size: 256mb
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./video:/srv/video:ro
+      - ./openlitespeed_config/certs:/run/tls:ro
+      - openlitespeed_certs:/usr/local/lsws/conf/cert
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - LSQUIC_QLOG_CAPTURE=${LSQUIC_QLOG_CAPTURE:-false}
+    depends_on:
+      - frontend
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: react_frontend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: node_backend
+    restart: unless-stopped
+    network_mode: "service:${PROXY_SERVICE:-${COMPOSE_PROFILES:-openlitespeed}}"
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      - "${PROXY_SERVICE:-${COMPOSE_PROFILES:-openlitespeed}}"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_runtime_config:
+  openlitespeed_certs:

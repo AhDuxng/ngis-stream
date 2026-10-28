@@ -1,0 +1,42 @@
+# Caddy configuration for local runs. Enables HTTP/1.1, HTTP/2 and HTTP/3 with a
+# certificate from Caddy's internal CA, serves DASH media from /srv/video with
+# caching disabled and Timing-Allow-Origin set for the Resource Timing API,
+# proxies /api to the backend on the shared loopback and every other path to the
+# frontend container.
+
+{
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+{$DOMAIN:localhost}, localhost, 127.0.0.1 {
+    tls internal
+    encode zstd gzip
+
+    @preflight method OPTIONS
+    handle @preflight {
+        header Access-Control-Allow-Origin *
+        header Access-Control-Allow-Methods "GET, POST, PUT, OPTIONS"
+        header Access-Control-Allow-Headers "Content-Type, Authorization, Range"
+        respond "" 204
+    }
+
+    handle /video/* {
+        header Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        header Pragma "no-cache"
+        header Expires "0"
+        header Timing-Allow-Origin *
+        header Access-Control-Allow-Origin *
+        root * /srv
+        file_server
+    }
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:{$PORT:3000}
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}

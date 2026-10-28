@@ -1,0 +1,15 @@
+# Paths excluded from Docker build contexts that use the repository root.
+
+.git
+.env
+.env.*
+backend
+caddy_config
+openlitespeed_config
+video
+logs
+frontend/node_modules
+frontend/dist
+frontend/.vite
+**/.DS_Store
+**/*.log

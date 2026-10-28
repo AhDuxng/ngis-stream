@@ -1,0 +1,170 @@
+/**
+ * Composite DASH player. Connects useDashPlayer to the video stage, telemetry,
+ * network simulation, replay and console panels, and exposes reset, play and
+ * pause to the parent through a ref.
+ */
+
+import { forwardRef, useImperativeHandle, useState } from "react";
+import { networkScenarios } from "../constants/networkScenarios";
+import { useDashPlayer } from "../hooks/useDashPlayer";
+import { useReplayControl } from "../hooks/useReplayControl";
+import { useVideoPlayerViewState } from "../hooks/useVideoPlayerViewState";
+import { DashVideoStage } from "./DashVideoStage";
+import { NetworkSimulationPanel } from "./NetworkSimulationPanel";
+import { ConsoleLogsPanel } from "./ConsoleLogsPanel";
+import { ReplayControlPanel } from "./ReplayControlPanel";
+import { StreamTelemetryCard } from "./StreamTelemetryCard";
+
+interface VideoPlayerProps {
+  manifestUrl: string;
+  streamTitle?: string;
+  segmentSeconds?: number | null;
+  variant?: "full" | "compact";
+  onProtocolChange?: (protocol: string) => void;
+}
+
+export interface VideoPlayerHandle {
+  reset: () => void;
+  play: () => void;
+  pause: () => void;
+}
+
+const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
+  ({ manifestUrl, streamTitle = "Video", segmentSeconds = null, variant = "full", onProtocolChange }, ref) => {
+    const {
+      videoRef, representations, isPlaying, isFragmentLoading, stats,
+      activeScenarioId, qualitySelection, isAutoQuality,
+      logs, applyScenario, setQualitySelection, togglePlayPause, resetStats,
+      play, pause,
+      getStatsSnapshot, getSegmentQosRecords, getPlaybackQoeSamples,
+      replayCount, currentReplay, isReplayDone, setReplayCount,
+    } = useDashPlayer({ manifestUrl, scenarios: networkScenarios, streamTitle, segmentSeconds });
+
+    useImperativeHandle(ref, () => ({ reset: resetStats, play, pause }), [pause, play, resetStats]);
+
+    const [isManualMode, setIsManualMode] = useState(false);
+    const { replayInput, updateReplayCount } = useReplayControl(replayCount, setReplayCount);
+    const { activeScenario, profileLabel } = useVideoPlayerViewState({
+      activeScenarioId,
+      isAutoQuality,
+      qualitySelection,
+      representations,
+      protocolLabel: stats.protocolLabel,
+      onProtocolChange,
+    });
+
+    const videoStage = (
+      <DashVideoStage
+        videoRef={videoRef}
+        manifestUrl={manifestUrl}
+        streamTitle={streamTitle}
+        stats={stats}
+        profileLabel={profileLabel}
+        representations={representations}
+        qualitySelection={qualitySelection}
+        isAutoQuality={isAutoQuality}
+        isPlaying={isPlaying}
+        isReplayDone={isReplayDone}
+        replayCount={replayCount}
+        currentReplay={currentReplay}
+        logsCount={logs.length}
+        togglePlayPause={togglePlayPause}
+        resetStats={resetStats}
+        setQualitySelection={setQualitySelection}
+      />
+    );
+
+    const networkActivityCard = (
+      <div
+        className={`rounded-lg border px-4 py-3 text-center text-sm font-bold tracking-wide shadow-sm ${
+          isFragmentLoading
+            ? "border-green-300 bg-green-50 text-green-800"
+            : "border-slate-200 bg-white text-slate-500"
+        }`}
+        role="status"
+        aria-live="polite"
+      >
+        {isFragmentLoading
+          ? "NETWORK ACTIVE — HANDOVER NOW"
+          : "WAITING FOR NEXT SEGMENT"}
+      </div>
+    );
+
+    if (variant === "compact") {
+      return (
+        <div className="flex flex-col gap-3 min-w-0">
+          {videoStage}
+          {networkActivityCard}
+          <ReplayControlPanel
+            replayCount={replayCount}
+            currentReplay={currentReplay}
+            isReplayDone={isReplayDone}
+            isPlaying={isPlaying}
+            logsCount={logs.length}
+            replayInput={replayInput}
+            onReplayChange={updateReplayCount}
+            onReset={resetStats}
+          />
+          <StreamTelemetryCard stats={stats} isPlaying={isPlaying} compact />
+          <ConsoleLogsPanel
+            logs={logs}
+            getStatsSnapshot={getStatsSnapshot}
+            getSegmentQosRecords={getSegmentQosRecords}
+            getPlaybackQoeSamples={getPlaybackQoeSamples}
+            representations={representations}
+            isAutoQuality={isAutoQuality}
+            activeScenario={activeScenario}
+            streamTitle={streamTitle}
+            compact
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-4 w-full">
+        <div className="flex flex-col lg:flex-row gap-4 w-full">
+          <div className="flex flex-col flex-1 min-w-0">
+            {videoStage}
+            <div className="mt-3">
+              {networkActivityCard}
+            </div>
+
+            <ReplayControlPanel
+              replayCount={replayCount}
+              currentReplay={currentReplay}
+              isReplayDone={isReplayDone}
+              isPlaying={isPlaying}
+              logsCount={logs.length}
+              replayInput={replayInput}
+              onReplayChange={updateReplayCount}
+              onReset={resetStats}
+            />
+          </div>
+
+          <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
+            <NetworkSimulationPanel
+              currentBitrateKbps={stats.bitrateKbps} representations={representations} isAutoQuality={isAutoQuality}
+              activeScenarioId={activeScenarioId} qualitySelection={qualitySelection}
+              setQualitySelection={setQualitySelection} applyScenario={applyScenario}
+              isManualMode={isManualMode} setIsManualMode={setIsManualMode}
+            />
+            <ConsoleLogsPanel
+              logs={logs} getStatsSnapshot={getStatsSnapshot}
+              getSegmentQosRecords={getSegmentQosRecords}
+              getPlaybackQoeSamples={getPlaybackQoeSamples}
+              representations={representations}
+              isAutoQuality={isAutoQuality} activeScenario={activeScenario}
+              streamTitle={streamTitle}
+            />
+          </div>
+        </div>
+
+        <StreamTelemetryCard stats={stats} isPlaying={isPlaying} />
+      </div>
+    );
+  },
+);
+
+VideoPlayer.displayName = "VideoPlayer";
+export default VideoPlayer;
