@@ -180,7 +180,7 @@ function App() {
                 className="inline-flex items-center gap-1.5 text-sm border border-slate-300 text-slate-600 px-3 py-1.5 rounded hover:bg-slate-50 transition-colors"
               >
                 <FaArrowLeft className="w-3 h-3" />
-                Quay lại
+                Back
               </button>
             </>
           )}
@@ -191,7 +191,7 @@ function App() {
               className="inline-flex items-center gap-1.5 text-sm border border-slate-300 text-slate-600 px-3 py-1.5 rounded hover:bg-slate-50 transition-colors"
             >
               <FaArrowLeft className="w-3 h-3" />
-              Chọn lại
+              Choose again
             </button>
           )}
         </div>
@@ -250,8 +250,8 @@ function App() {
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-lg border border-slate-200 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
               <div>
-                <div className="text-[11px] font-bold tracking-widest text-slate-500">CHỌN 2 VIDEO</div>
-                <div className="text-sm text-slate-500">{selectedDualVideos.length}/2 video đang được chọn</div>
+                <div className="text-[11px] font-bold tracking-widest text-slate-500">SELECT 2 VIDEOS</div>
+                <div className="text-sm text-slate-500">{selectedDualVideos.length}/2 videos selected</div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {streamItems.map((video) => {
@@ -293,7 +293,7 @@ function App() {
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500">
-                Hãy chọn đủ 2 video để bắt đầu so sánh song song.
+                Select 2 videos to start a side-by-side comparison.
               </div>
             )}
           </div>
